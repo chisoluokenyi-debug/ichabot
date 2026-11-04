@@ -1,15 +1,14 @@
 const express = require("express");
-const bodyParser = require("body-parser");
+const axios = require("axios");
 
 const app = express();
-
-app.use(bodyParser.json());
+app.use(express.json());
 
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
 app.get("/", (req, res) => {
-    res.send("Facebook Chatbot is running successfully!");
+    res.send("IchaBot is running successfully!");
 });
 
 // Facebook webhook verification
@@ -19,60 +18,74 @@ app.get("/webhook", (req, res) => {
     const challenge = req.query["hub.challenge"];
 
     if (mode === "subscribe" && token === VERIFY_TOKEN) {
-        res.status(200).send(challenge);
-    } else {
-        res.sendStatus(403);
+        return res.status(200).send(challenge);
     }
+
+    res.sendStatus(403);
 });
 
 // Receive Facebook messages
 app.post("/webhook", async (req, res) => {
-    const body = req.body;
+    res.sendStatus(200);
 
-    if (body.object === "page") {
-        body.entry.forEach(entry => {
-            const webhookEvent = entry.messaging[0];
+    try {
+        const body = req.body;
 
-            if (webhookEvent.message && webhookEvent.message.text) {
-                const senderId = webhookEvent.sender.id;
-                const message = webhookEvent.message.text;
+        if (body.object === "page") {
+            for (const entry of body.entry || []) {
+                for (const event of entry.messaging || []) {
 
-                sendMessage(senderId, "Hello! Welcome to our chatbot. How can I help you today?");
+                    if (event.message && !event.message.is_echo) {
+                        const sender = event.sender.id;
+                        const message = event.message.text || "";
+
+                        if (message) {
+                            await sendMessage(
+                                sender,
+                                "Welcome to IchaBot! Thanks for contacting us. How can we help you?"
+                            );
+                        }
+                    }
+                }
             }
-        });
-
-        res.status(200).send("EVENT_RECEIVED");
-    } else {
-        res.sendStatus(404);
+        }
+    } catch (error) {
+        console.error("Webhook error:", error.message);
     }
 });
 
-// Send reply to Facebook Messenger
-async function sendMessage(senderId, text) {
+// Send Messenger reply
+async function sendMessage(userId, text) {
+    if (!PAGE_ACCESS_TOKEN) {
+        console.error("Missing PAGE_ACCESS_TOKEN");
+        return;
+    }
+
     try {
-        const response = await fetch(
-            `https://graph.facebook.com/v23.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+        await axios.post(
+            "https://graph.facebook.com/v23.0/me/messages",
             {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    recipient: { id: senderId },
-                    message: { text: text }
-                })
+                recipient: { id: userId },
+                message: { text: text }
+            },
+            {
+                params: {
+                    access_token: PAGE_ACCESS_TOKEN
+                }
             }
         );
 
-        const result = await response.json();
-        console.log(result);
+        console.log("Message sent successfully");
     } catch (error) {
-        console.error("Message error:", error);
+        console.error(
+            "Message error:",
+            error.response?.data || error.message
+        );
     }
 }
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`Chatbot running on port ${PORT}`);
+    console.log("IchaBot is running on port " + PORT);
 });
