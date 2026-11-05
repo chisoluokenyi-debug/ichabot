@@ -25,7 +25,11 @@ app.get("/webhook", (req, res) => {
 });
 
 // Receive Facebook messages
+
 app.post("/webhook", async (req, res) => {
+    console.log("FACEBOOK WEBHOOK RECEIVED");
+    console.log(JSON.stringify(req.body, null, 2));
+
     res.sendStatus(200);
 
     try {
@@ -38,6 +42,8 @@ app.post("/webhook", async (req, res) => {
                     if (event.message && !event.message.is_echo) {
                         const sender = event.sender.id;
                         const message = event.message.text || "";
+
+                        console.log("Incoming message:", message);
 
                         if (message) {
                             await sendMessage(
@@ -52,40 +58,4 @@ app.post("/webhook", async (req, res) => {
     } catch (error) {
         console.error("Webhook error:", error.message);
     }
-});
-
-// Send Messenger reply
-async function sendMessage(userId, text) {
-    if (!PAGE_ACCESS_TOKEN) {
-        console.error("Missing PAGE_ACCESS_TOKEN");
-        return;
-    }
-
-    try {
-        await axios.post(
-            "https://graph.facebook.com/v23.0/me/messages",
-            {
-                recipient: { id: userId },
-                message: { text: text }
-            },
-            {
-                params: {
-                    access_token: PAGE_ACCESS_TOKEN
-                }
-            }
-        );
-
-        console.log("Message sent successfully");
-    } catch (error) {
-        console.error(
-            "Message error:",
-            error.response?.data || error.message
-        );
-    }
-}
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log("IchaBot is running on port " + PORT);
 });
